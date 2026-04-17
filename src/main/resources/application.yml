@@ -1,0 +1,165 @@
+server:
+  port: 9080
+
+spring:
+  application:
+    name: api-gateway
+
+  # JDK 21 Virtual Threads 활성화
+  threads:
+    virtual:
+      enabled: true
+
+  # Redis (Rate Limiting용)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  # Spring Cloud Discovery 비활성화 (Eureka/Consul 미사용)
+  cloud:
+    discovery:
+      enabled: false
+    serviceregistry:
+      auto-registration:
+        enabled: false
+
+    gateway:
+      # 중복 CORS 헤더 제거 (프록시 체인에서 발생하는 중복 방지)
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
+      # 글로벌 CORS 정책
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      # 라우트 정의
+      routes:
+        # User Service
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: userServiceCB
+                fallbackUri: forward:/fallback/user-service
+          # Rate Limiter는 Redis 기동 후 아래 주석 해제
+          # - name: RequestRateLimiter
+          #   args:
+          #     redis-rate-limiter.replenishRate: 10
+          #     redis-rate-limiter.burstCapacity: 20
+
+        # Product Service
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: productServiceCB
+                fallbackUri: forward:/fallback/product-service
+
+        # Order Service
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: orderServiceCB
+                fallbackUri: forward:/fallback/order-service
+
+# JWT 설정
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-change-in-production-please}
+  expiration-ms: ${JWT_EXPIRATION_MS:3600000}   # 1시간
+  whitelist-paths:
+    - /auth/**
+    - /public/**
+    - /actuator/health
+    - /actuator/info
+    - /v3/api-docs/**
+    - /swagger-ui/**
+    - /fallback/**
+
+# Resilience4j Circuit Breaker
+resilience4j:
+  circuitbreaker:
+    instances:
+      userServiceCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      productServiceCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      orderServiceCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+  timelimiter:
+    instances:
+      userServiceCB:
+        timeoutDuration: 5s
+      productServiceCB:
+        timeoutDuration: 5s
+      orderServiceCB:
+        timeoutDuration: 5s
+
+# Actuator (모니터링 엔드포인트)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, gateway, prometheus
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  # Redis / Discovery 헬스 체크 — 미사용 시 DOWN 방지
+  health:
+    redis:
+      enabled: false
+    discovery:
+      enabled: false
+
+# SpringDoc OpenAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.example.gateway: DEBUG
