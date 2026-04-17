@@ -55,6 +55,54 @@ mvn spring-boot:run
 - [ ] CORS allowedOriginPatterns 도메인 특정으로 변경
 - [ ] Actuator 외부 노출 경로 health, info로 제한
 
+## 코딩 컨벤션
+
+### 네이밍
+- 클래스명: `PascalCase` (예: `AuthenticationFilter`, `JwtTokenProvider`)
+- 메서드/변수명: `camelCase` (예: `generateToken`, `userId`)
+- 상수: `UPPER_SNAKE_CASE` (예: `BEARER_PREFIX`, `HEADER_USER_ID`)
+- 패키지명: 소문자 단수형 (예: `filter`, `security`, `config`)
+- 메서드명은 동사로 시작 (예: `generate`, `parse`, `validate`, `is`, `has`)
+
+### 코드 구조
+- 하나의 클래스/메서드는 하나의 책임만 가진다 (단일 책임 원칙)
+- 메서드 길이는 30줄 이내 권장, 길어지면 분리
+- 중복 코드는 공통 메서드/유틸로 추출
+- 매직 넘버/문자열은 상수로 선언
+- 인터페이스 기반으로 설계, 구현체에 직접 의존 금지
+
+### 객체지향 원칙
+- 공통 기능은 추상화하여 재사용 (상속보다 조합 우선)
+- 외부에 노출할 필요 없는 필드/메서드는 `private` 처리
+- 불변 객체 우선 사용 (`final`, `record` 활용)
+- `null` 반환 대신 `Optional` 또는 빈 컬렉션 반환
+
+### 공통화 처리
+- 에러 응답 형식은 `GlobalExceptionHandler`에서 일괄 처리
+- 공통 헤더(Correlation ID 등)는 Filter에서 일괄 처리
+- 상수는 관련 클래스 내부 또는 별도 `Constants` 클래스에서 관리
+- 설정값은 `@Value` 또는 `@ConfigurationProperties`로 중앙 관리
+
+### 가독성
+- 주석은 "무엇"이 아닌 "왜"를 설명 (코드 자체가 무엇인지 표현해야 함)
+- 복잡한 로직에는 처리 흐름을 단계별로 주석 기재
+- 메서드/클래스명만 봐도 역할을 알 수 있게 작성
+- 조건문은 긍정 표현 우선, 부정 중첩 지양
+
+### 패키지 구조
+```
+com.example.gateway
+├── config      # Spring 설정 (Security, Gateway 등)
+├── filter      # GlobalFilter (인증, 로깅, CorrelationId 등)
+├── handler     # Controller, ExceptionHandler
+└── security    # JWT 관련 클래스
+```
+
+### 테스트
+- 단위 테스트는 외부 의존성 없이 작성 (Mock 활용)
+- 테스트 메서드명은 한글 또는 `should_동작_when_조건` 형식
+- 하나의 테스트는 하나의 케이스만 검증
+
 ## 보안 코딩 룰
 
 ### 인증/인가
