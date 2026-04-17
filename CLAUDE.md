@@ -55,5 +55,43 @@ mvn spring-boot:run
 - [ ] CORS allowedOriginPatterns 도메인 특정으로 변경
 - [ ] Actuator 외부 노출 경로 health, info로 제한
 
+## 보안 코딩 룰
+
+### 인증/인가
+- JWT Secret은 반드시 환경변수로 관리, 코드/설정 파일에 하드코딩 금지
+- 토큰 만료시간은 최소한으로 설정 (Access Token 1시간 이하)
+- 화이트리스트 경로는 `SecurityConfig`와 `AuthenticationFilter` 양쪽 모두 동기화 유지
+- 다운스트림 서비스에 전달하는 `X-User-Id`, `X-User-Roles` 헤더는 클라이언트 입력값을 그대로 전달하지 말 것 (반드시 Gateway에서 JWT 파싱 후 주입)
+
+### 입력값 검증
+- 외부에서 들어오는 모든 입력값은 경계에서 검증
+- 헤더, 쿼리 파라미터에 대한 길이 및 형식 검증 적용
+- SQL Injection, XSS, Command Injection 방지를 위해 입력값을 그대로 로그에 출력 금지
+
+### 시크릿 관리
+- 비밀번호, API Key, 인증서 등 민감정보는 코드에 절대 포함 금지
+- `.env` 파일은 `.gitignore`에 반드시 포함
+- Git 커밋 전 민감정보 포함 여부 확인
+
+### 통신 보안
+- 운영 환경에서는 반드시 HTTPS 사용
+- CORS `allowedOriginPatterns`는 운영 시 특정 도메인만 허용 (`*` 금지)
+- 내부 서비스 간 통신도 가능하면 mTLS 적용 권장
+
+### 로깅
+- 토큰, 비밀번호, 개인정보(이름/이메일/주민번호 등)는 로그에 출력 금지
+- 에러 로그에 스택트레이스를 클라이언트에 노출 금지 (내부 로그에만 기록)
+- 모든 인증 실패 이벤트는 반드시 로깅
+
+### 의존성
+- 사용하지 않는 의존성 제거
+- 주기적으로 `mvn dependency:check` 또는 Snyk 등으로 취약점 스캔
+- 서드파티 라이브러리 버전 최신 보안 패치 유지
+
+### 운영 환경
+- `/auth/token` 엔드포인트는 `@Profile("!prod")`로 운영 비활성화 유지 (절대 운영 노출 금지)
+- Actuator 엔드포인트는 `health`, `info`만 외부 노출, 나머지는 내부망 제한
+- Rate Limiter 반드시 활성화하여 브루트포스 공격 방지
+
 ## Git 저장소
 https://github.com/young-duk/product1
